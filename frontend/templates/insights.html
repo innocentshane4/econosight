@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Insights & Predictions{% endblock %}
+
+{% block content %}
+
+<div style="background:linear-gradient(135deg,#0d1b2a,#243b55); padding:4rem 2rem; color:white; text-align:center;">
+    <h1 style="font-size:2.2rem; font-weight:900; margin-bottom:1rem;">📈 Insights & Predictions</h1>
+    <p style="color:#aabbcc; font-size:1.1rem; max-width:640px; margin:0 auto;">
+        We take raw economic data and turn it into intelligence — trend analysis, forecasting, anomaly detection, and country comparisons.
+    </p>
+</div>
+
+<div class="section" style="max-width:1200px;">
+
+    <!-- Controls -->
+    <div class="card" style="margin-bottom:2rem;">
+        <h3 style="font-weight:700; color:#0d1b2a; margin-bottom:1.2rem;">Configure Your Analysis</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; align-items:end;">
+            <div class="form-group" style="margin:0;">
+                <label>Primary Country</label>
+                <select id="country-select"></select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Indicator</label>
+                <select id="indicator-select"></select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Years to Forecast</label>
+                <select id="years-select">
+                    <option value="3">3 Years</option>
+                    <option value="5" selected>5 Years</option>
+                    <option value="10">10 Years</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="runAnalysis()" style="height:44px;">Run Analysis</button>
+        </div>
+        <!-- Compare countries -->
+        <div style="margin-top:1.2rem; padding-top:1.2rem; border-top:1px solid #eee;">
+            <label style="font-weight:600; color:#0d1b2a; display:block; margin-bottom:0.6rem;">Compare with (optional)</label>
+            <div id="compare-checks" style="display:flex; flex-wrap:wrap; gap:0.6rem;"></div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" style="display:none; text-align:center; padding:3rem;">
+        <div style="font-size:2rem; margin-bottom:1rem;">⏳</div>
+        <p style="color:#8899aa;">Running analysis...</p>
+    </div>
+
+    <!-- Results -->
+    <div id="results" style="display:none;">
+
+        <!-- Summary card -->
+        <div class="card" style="border-left:5px solid #00c9a7; margin-bottom:1.5rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:#00c9a7; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.6rem;">AI Summary</div>
+            <p id="summary-text" style="color:#1a2535; font-size:1.05rem; line-height:1.7;"></p>
+        </div>
+
+        <!-- Trend metrics -->
+        <div class="metrics-row" id="trend-metrics" style="margin-bottom:1.5rem;"></div>
+
+        <!-- Charts row -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+            <div class="card">
+                <div id="chart-historical" style="height:360px;"></div>
+            </div>
+            <div class="card">
+                <div id="chart-forecast" style="height:360px;"></div>
+            </div>
+        </div>
+
+        <!-- YoY and anomalies -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+            <div class="card">
+                <div id="chart-yoy" style="height:300px;"></div>
+            </div>
+            <div class="card" id="anomaly-card">
+                <h3 style="font-weight:700; color:#0d1b2a; margin-bottom:1rem;">⚠️ Anomaly Detection</h3>
+                <p style="color:#8899aa; font-size:0.9rem; margin-bottom:1rem;">Years where the indicator deviated significantly from the long-term trend.</p>
+                <div id="anomaly-list"></div>
+            </div>
+        </div>
+
+        <!-- Comparison chart (shown when countries selected) -->
+        <div class="card" id="compare-card" style="display:none; margin-bottom:1.5rem;">
+            <div id="chart-compare" style="height:380px;"></div>
+            <div id="compare-summary" style="margin-top:1rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem;"></div>
+        </div>
+
+        <!-- Data table -->
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h3 style="font-weight:700; color:#0d1b2a;">Full Data + Projections</h3>
+                <button class="btn btn-sm btn-outline" onclick="exportCSV()" style="color:#0d1b2a; border-color:#0d1b2a;">Export CSV</button>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead><tr><th>Year</th><th>Value</th><th>Type</th><th>YoY Change</th></tr></thead>
+                    <tbody id="full-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+let lastData   = null;
+let lastAnomalies = null;
+
+async function initSelects() {
+    const [countries, indicators] = await Promise.all([
+        apiFetch("/data/countries"),
+        apiFetch("/data/indicators")
+    ]);
+
+    const cs = document.getElementById("country-select");
+    const is = document.getElementById("indicator-select");
+    const checks = document.getElementById("compare-checks");
+    const all = { ...countries.african, ...countries.global };
+
+    Object.entries(all).forEach(([code, name]) => {
+        cs.add(new Option(name, code));
+    });
+
+    Object.entries(indicators).forEach(([code, name]) => {
+        is.add(new Option(name, code));
+    });
+
+    // Comparison checkboxes
+    Object.entries(countries.african).forEach(([code, name]) => {
+        const label = document.createElement("label");
+        label.style.cssText = "display:flex;align-items:center;gap:0.4rem;cursor:pointer;background:#f4f7fb;padding:0.4rem 0.8rem;border-radius:20px;font-size:0.9rem;";
+        label.innerHTML = `<input type="checkbox" value="${code}" style="accent-color:#00c9a7;"> ${name}`;
+        checks.appendChild(label);
+    });
+}
+
+async function runAnalysis() {
+    const country   = document.getElementById("country-select").value;
+    const indicator = document.getElementById("indicator-select").value;
+    const years     = document.getElementById("years-select").value;
+
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("results").style.display  = "none";
+
+    try {
+        const [pred, anom] = await Promise.all([
+            apiFetch(`/insights/predict?country=${country}&indicator=${indicator}&years_ahead=${years}`),
+            apiFetch(`/insights/anomalies?country=${country}&indicator=${indicator}`)
+        ]);
+
+        lastData     = pred;
+        lastAnomalies = anom;
+
+        // Summary
+        document.getElementById("summary-text").textContent = pred.summary;
+
+        // Trend metrics
+        document.getElementById("trend-metrics").innerHTML = [
+            { label: "Trend Direction", value: pred.trend.label, color: pred.trend.direction === "upward" ? "#0a7a5c" : pred.trend.direction === "downward" ? "#c0392b" : "#b7791f" },
+            { label: "Total Change", value: (pred.trend.pct_change_total > 0 ? "+" : "") + pred.trend.pct_change_total + "%", color: pred.trend.pct_change_total > 0 ? "#0a7a5c" : "#c0392b" },
+            { label: "Model Confidence", value: pred.trend.confidence, color: pred.trend.confidence === "High" ? "#0a7a5c" : pred.trend.confidence === "Medium" ? "#b7791f" : "#c0392b" },
+            { label: "Volatility", value: pred.volatility.label, color: pred.volatility.label === "Low" ? "#0a7a5c" : pred.volatility.label === "Medium" ? "#b7791f" : "#c0392b" }
+        ].map(m => `
+            <div class="metric-card">
+                <div class="metric-label">${m.label}</div>
+                <div class="metric-value" style="color:${m.color}; font-size:1.4rem;">${m.value}</div>
+            </div>
+        `).join("");
+
+        // Historical chart
+        const hist = pred.historical;
+        Plotly.newPlot("chart-historical", [{
+            x: hist.map(h => h.year),
+            y: hist.map(h => h.value),
+            type: "scatter", mode: "lines+markers",
+            name: "Historical",
+            line: { color: "#0096ff", width: 2.5 },
+            marker: { color: "#0096ff", size: 6 }
+        }], {
+            title: { text: `${pred.country} — ${pred.indicator} (Historical)`, font: { color: "#1a2535", size: 14 } },
+            xaxis: { gridcolor: "#eeeeee" },
+            yaxis: { gridcolor: "#eeeeee" },
+            plot_bgcolor: "#ffffff", paper_bgcolor: "#ffffff",
+            font: { color: "#1a2535" }, margin: { t: 50, b: 40, l: 60, r: 20 }
+        }, { responsive: true });
+
+        // Forecast chart — historical + projections
+        const proj = pred.projections;
+        const lastHist = hist[hist.length - 1];
+        Plotly.newPlot("chart-forecast", [
+            {
+                x: hist.map(h => h.year),
+                y: hist.map(h => h.value),
+                type: "scatter", mode: "lines", name: "Historical",
+                line: { color: "#0096ff", width: 2 }
+            },
+            {
+                x: [lastHist.year, ...proj.map(p => p.year)],
+                y: [lastHist.value, ...proj.map(p => p.predicted_value)],
+                type: "scatter", mode: "lines+markers", name: "Forecast",
+                line: { color: "#00c9a7", width: 2.5, dash: "dot" },
+                marker: { color: "#00c9a7", size: 7 }
+            }
+        ], {
+            title: { text: `${pred.country} — ${years}-Year Forecast`, font: { color: "#1a2535", size: 14 } },
+            xaxis: { gridcolor: "#eeeeee" },
+            yaxis: { gridcolor: "#eeeeee" },
+            plot_bgcolor: "#ffffff", paper_bgcolor: "#ffffff",
+            font: { color: "#1a2535" }, margin: { t: 50, b: 40, l: 60, r: 20 },
+            legend: { orientation: "h", y: -0.2 }
+        }, { responsive: true });
+
+        // YoY chart
+        const yoy = pred.year_on_year;
+        Plotly.newPlot("chart-yoy", [{
+            x: yoy.map(y => y.year),
+            y: yoy.map(y => y.change_pct),
+            type: "bar",
+            marker: { color: yoy.map(y => y.change_pct >= 0 ? "#00c9a7" : "#e94560") }
+        }], {
+            title: { text: "Year-on-Year Change (%)", font: { color: "#1a2535", size: 14 } },
+            xaxis: { gridcolor: "#eeeeee" },
+            yaxis: { gridcolor: "#eeeeee", zeroline: true, zerolinecolor: "#cccccc" },
+            plot_bgcolor: "#ffffff", paper_bgcolor: "#ffffff",
+            font: { color: "#1a2535" }, margin: { t: 50, b: 40, l: 60, r: 20 }
+        }, { responsive: true });
+
+        // Anomalies
+        const alist = document.getElementById("anomaly-list");
+        if (anom.anomalies.length === 0) {
+            alist.innerHTML = `<p style="color:#0a7a5c; font-weight:600;">✓ No significant anomalies detected.</p>`;
+        } else {
+            alist.innerHTML = anom.anomalies.map(a => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid #f0f0f0;">
+                    <div>
+                        <strong>${a.year}</strong>
+                        <span style="margin-left:0.5rem;" class="badge ${a.deviation === 'above' ? 'badge-blue' : 'badge-red'}">${a.deviation} average</span>
+                        <span class="badge ${a.severity === 'Extreme' ? 'badge-red' : a.severity === 'High' ? 'badge-yellow' : 'badge-blue'}" style="margin-left:0.3rem;">${a.severity}</span>
+                    </div>
+                    <strong>${parseFloat(a.value).toLocaleString()}</strong>
+                </div>
+            `).join("");
+        }
+
+        // Comparison
+        const checked = [...document.querySelectorAll("#compare-checks input:checked")].map(c => c.value);
+        if (checked.length > 0) {
+            const allCodes = [country, ...checked.filter(c => c !== country)];
+            const comp = await apiFetch(`/insights/compare-trends?countries=${allCodes.join(",")}&indicator=${indicator}`);
+            document.getElementById("compare-card").style.display = "block";
+
+            const traces = comp.countries.map(c => ({
+                x: [c.country_name],
+                y: [c.pct_change],
+                type: "bar", name: c.country_name,
+                marker: { color: c.pct_change >= 0 ? "#00c9a7" : "#e94560" }
+            }));
+
+            Plotly.newPlot("chart-compare", traces, {
+                title: { text: `Total % Change — ${comp.indicator}`, font: { color: "#1a2535", size: 14 } },
+                xaxis: { gridcolor: "#eeeeee" },
+                yaxis: { gridcolor: "#eeeeee", title: "% Change" },
+                plot_bgcolor: "#ffffff", paper_bgcolor: "#ffffff",
+                font: { color: "#1a2535" }, margin: { t: 50, b: 40, l: 60, r: 20 },
+                barmode: "group", showlegend: false
+            }, { responsive: true });
+
+            document.getElementById("compare-summary").innerHTML = comp.countries.map(c => `
+                <div class="metric-card">
+                    <div class="metric-label">${c.country_name}</div>
+                    <div class="metric-value" style="font-size:1.2rem; color:${c.pct_change >= 0 ? '#0a7a5c' : '#c0392b'}">
+                        ${c.pct_change >= 0 ? '+' : ''}${c.pct_change}%
+                    </div>
+                    <div class="metric-sub">${c.trend_label} · ${c.latest_year}</div>
+                </div>
+            `).join("");
+        } else {
+            document.getElementById("compare-card").style.display = "none";
+        }
+
+        // Full table
+        const tbody = document.getElementById("full-table");
+        const yoyMap = {};
+        yoy.forEach(y => yoyMap[y.year] = y.change_pct);
+        const histRows = hist.map(h => `
+            <tr>
+                <td>${h.year}</td>
+                <td>${parseFloat(h.value).toLocaleString()}</td>
+                <td><span class="badge badge-blue">Historical</span></td>
+                <td style="color:${(yoyMap[h.year] || 0) >= 0 ? '#0a7a5c' : '#c0392b'}">
+                    ${yoyMap[h.year] ? (yoyMap[h.year] >= 0 ? '+' : '') + yoyMap[h.year] + '%' : '—'}
+                </td>
+            </tr>
+        `).join("");
+        const projRows = proj.map(p => `
+            <tr style="background:#f8fff8;">
+                <td>${p.year}</td>
+                <td>${parseFloat(p.predicted_value).toLocaleString()}</td>
+                <td><span class="badge badge-green">Forecast</span></td>
+                <td>—</td>
+            </tr>
+        `).join("");
+        tbody.innerHTML = histRows + projRows;
+
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("results").style.display = "block";
+
+    } catch(e) {
+        document.getElementById("loading").style.display = "none";
+        alert("Analysis failed: " + e.message);
+    }
+}
+
+function exportCSV() {
+    if (!lastData) return;
+    const rows = [
+        "Year,Value,Type",
+        ...lastData.historical.map(h => `${h.year},${h.value},Historical`),
+        ...lastData.projections.map(p => `${p.year},${p.predicted_value},Forecast`)
+    ].join("\n");
+    const blob = new Blob([rows], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `econosight_forecast.csv`;
+    a.click();
+}
+
+initSelects();
+</script>
+{% endblock %}

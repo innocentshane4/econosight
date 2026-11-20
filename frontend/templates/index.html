@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+    <h1>African Economic Intelligence,<br><span>Built for Everyone</span></h1>
+    <p>Track GDP, inflation, currency rates, unemployment and more across Africa and the world — with a live dashboard, data explorer, and developer API.</p>
+    <div class="hero-buttons">
+        <a href="/explorer" class="btn btn-primary">Explore Data</a>
+        <a href="/register" class="btn btn-outline">Get Free API Key</a>
+    </div>
+</section>
+
+<!-- Stats bar -->
+<div style="background:#1b2d42; padding:1.5rem 2rem;">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1.5rem; text-align:center;">
+        <div><div style="font-size:1.8rem;font-weight:900;color:#00c9a7;">10+</div><div style="color:#aabbcc;font-size:0.9rem;">African Countries</div></div>
+        <div><div style="font-size:1.8rem;font-weight:900;color:#00c9a7;">8</div><div style="color:#aabbcc;font-size:0.9rem;">Economic Indicators</div></div>
+        <div><div style="font-size:1.8rem;font-weight:900;color:#00c9a7;">20yr</div><div style="color:#aabbcc;font-size:0.9rem;">Historical Data</div></div>
+        <div><div style="font-size:1.8rem;font-weight:900;color:#00c9a7;">Free</div><div style="color:#aabbcc;font-size:0.9rem;">API Access</div></div>
+    </div>
+</div>
+
+<!-- Features -->
+<div class="section">
+    <h2 class="section-title">Everything You Need</h2>
+    <p class="section-sub">From raw data to insights — one platform.</p>
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-icon">📊</div>
+            <h3>Live Dashboard</h3>
+            <p>Visual, interactive charts for GDP, inflation, unemployment and more. Updated regularly.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">🔍</div>
+            <h3>Data Explorer</h3>
+            <p>Compare any indicator across any countries. Filter by year, region, or metric.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">⚡</div>
+            <h3>Developer API</h3>
+            <p>Clean JSON endpoints, full documentation, and an API key you get instantly on signup.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">💱</div>
+            <h3>Currency Rates</h3>
+            <p>Live USD exchange rates for ZAR, NGN, KES, GHS and all major African currencies.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">🌍</div>
+            <h3>Africa-First</h3>
+            <p>Built specifically for African economic data — not an afterthought on a global platform.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">📥</div>
+            <h3>Export Data</h3>
+            <p>Download any dataset as CSV or Excel with one click. Use it in your own analysis.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Countries -->
+<div style="background:white; padding:4rem 2rem;">
+    <div style="max-width:1200px; margin:0 auto;">
+        <h2 class="section-title">Countries Covered</h2>
+        <p class="section-sub">Tracking economic data across the African continent and key global comparisons.</p>
+        <div id="countries-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:1rem; margin-top:1.5rem;"></div>
+    </div>
+</div>
+
+<!-- CTA -->
+<div style="background:linear-gradient(135deg,#0d1b2a,#243b55); padding:5rem 2rem; text-align:center;">
+    <h2 style="color:white; font-size:2rem; font-weight:800; margin-bottom:1rem;">Ready to explore African economic data?</h2>
+    <p style="color:#aabbcc; margin-bottom:2rem;">Free account. Instant API key. No credit card required.</p>
+    <a href="/register" class="btn btn-primary">Create Free Account</a>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadCountries() {
+    try {
+        const data = await apiFetch("/data/countries");
+        const grid = document.getElementById("countries-grid");
+        const all = { ...data.african, ...data.global };
+        const flags = {
+            ZA:"🇿🇦", NG:"🇳🇬", KE:"🇰🇪", GH:"🇬🇭", EG:"🇪🇬",
+            ET:"🇪🇹", TZ:"🇹🇿", MA:"🇲🇦", RW:"🇷🇼", UG:"🇺🇬",
+            US:"🇺🇸", GB:"🇬🇧", CN:"🇨🇳", DE:"🇩🇪", BR:"🇧🇷", IN:"🇮🇳"
+        };
+        grid.innerHTML = Object.entries(all).map(([code, name]) => `
+            <a href="/explorer?country=${code}" style="text-decoration:none;">
+                <div class="card" style="text-align:center; padding:1.2rem; cursor:pointer;">
+                    <div style="font-size:2rem;">${flags[code] || "🌍"}</div>
+                    <div style="font-weight:700; color:#0d1b2a; margin-top:0.4rem; font-size:0.9rem;">${name}</div>
+                    <div style="font-size:0.8rem; color:#8899aa;">${code}</div>
+                </div>
+            </a>
+        `).join("");
+    } catch(e) {}
+}
+loadCountries();
+</script>
+{% endblock %}

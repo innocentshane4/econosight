@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<div style="padding:4rem 2rem;">
+    <div class="form-box">
+        <h2 class="form-title">Create Account</h2>
+        <p class="form-sub">Get your free API key instantly — no credit card required.</p>
+        <div id="alert" class="alert"></div>
+        <div id="api-key-section" style="display:none;">
+            <div class="alert alert-success show">Account created! Save your API key below — it will only be shown once.</div>
+            <div class="api-key-box">
+                <code id="api-key-display"></code>
+                <button class="copy-btn" onclick="copyText(document.getElementById('api-key-display').textContent, this)">Copy</button>
+            </div>
+            <a href="/login" class="btn btn-primary" style="display:block; text-align:center; margin-top:1rem;">Continue to Login</a>
+        </div>
+        <div id="register-form">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="full-name" placeholder="Your full name">
+            </div>
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Minimum 8 characters">
+            </div>
+            <button class="form-submit" onclick="registerUser()">Create Account</button>
+        </div>
+        <p class="form-link">Already have an account? <a href="/login">Login</a></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function registerUser() {
+    const name  = document.getElementById("full-name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const pass  = document.getElementById("password").value;
+    if (!email || !pass) return showAlert("alert", "Email and password are required.", "error");
+    if (pass.length < 8) return showAlert("alert", "Password must be at least 8 characters.", "error");
+    try {
+        const data = await apiFetch("/auth/register", {
+            method: "POST",
+            body: JSON.stringify({ email, password: pass, full_name: name })
+        });
+        document.getElementById("register-form").style.display = "none";
+        document.getElementById("api-key-section").style.display = "block";
+        document.getElementById("api-key-display").textContent = data.api_key || "Check your email.";
+    } catch(e) {
+        showAlert("alert", e.message, "error");
+    }
+}
+</script>
+{% endblock %}

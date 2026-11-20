@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EconoSight{% endblock %} — African Economic Intelligence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">Econo<span>Sight</span></a>
+    <div class="nav-links">
+        <a href="/explorer">Explorer</a>
+        <a href="/insights">Insights</a>
+        <a href="/developers">API</a>
+        <a href="/login"  class="nav-login">Login</a>
+        <span class="nav-logout" style="display:none; color:#aabbcc; font-size:0.95rem;">
+            <a href="/dashboard">👤 <span class="nav-username"></span></a>
+            &nbsp;·&nbsp;
+            <a href="#" onclick="logout()">Logout</a>
+        </span>
+        <a href="/register" class="btn btn-sm nav-cta nav-login">Get API Key</a>
+    </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<footer>
+    <p>© 2026 <span>EconoSight</span> — African Economic Intelligence Platform &nbsp;·&nbsp;
+    Data: World Bank, IMF, ExchangeRate-API &nbsp;·&nbsp;
+    Built with Python & FastAPI</p>
+</footer>
+
+<script src="/static/js/main.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
