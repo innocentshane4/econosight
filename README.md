@@ -2,7 +2,7 @@
 
 > A full-stack data platform for exploring, analysing, and predicting economic trends across Africa and the world.
 
-**Live Demo:** https://econosight.onrender.com *(deploy to activate)*  
+**Live: http://econosight.onrender.com/**
 **API Docs:** https://econosight.onrender.com/api/docs  
 **Built with:** Python · FastAPI · Supabase · Plotly · World Bank API
 
